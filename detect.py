@@ -36,6 +36,10 @@ from pathlib import Path
 
 import torch
 
+import qrcode
+from PIL import Image, ImageDraw, ImageFont
+
+
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLOv5 root directory
 if str(ROOT) not in sys.path:
@@ -136,6 +140,7 @@ def run(
 
         # Process predictions
         for i, det in enumerate(pred):  # per image
+
             seen += 1
             if webcam:  # batch_size >= 1
                 p, im0, frame = path[i], im0s[i].copy(), dataset.count
@@ -150,7 +155,20 @@ def run(
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+            
             if len(det):
+                # Extract relevant information from detection
+                image_name = Path(path).stem
+                fruits = []
+                for c in det[:, 5].unique():
+                    n = (det[:, 5] == c).sum()
+                    class_name = names[int(c)]
+                    fruits.append(f"{n} {class_name}{'' if n == 1 else 's'}")
+
+                # Generate and save the QR code
+                qr_code_path = str(save_dir / f"{image_name}_qr_code.png")
+                generate_qr_code(image_name, fruits, qr_code_path)
+
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
 
@@ -206,6 +224,10 @@ def run(
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
+
+
+
+
     # Print results
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
     LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
@@ -215,6 +237,26 @@ def run(
     if update:
         strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
 
+
+def generate_qr_code(image_name, fruits, save_path):
+    # Format the information string
+    information = f"{image_name}: {', '.join(fruits)}"
+    
+    # Create a new QR code image
+    qr = qrcode.QRCode(box_size=10, border=4)
+    qr.add_data(information)
+    qr.make(fit=True)
+    qr_image = qr.make_image(fill_color="black", back_color="white")
+    
+    # Add text overlay to the QR code image
+    draw = ImageDraw.Draw(qr_image)
+    font = ImageFont.load_default()
+    text_width, text_height = draw.textsize(information, font=font)
+    text_position = (qr_image.width // 2 - text_width // 2, qr_image.height - text_height - 10)
+    draw.text(text_position, information, fill="black", font=font)
+    
+    # Save the QR code image
+    qr_image.save(save_path)
 
 def parse_opt():
     parser = argparse.ArgumentParser()
