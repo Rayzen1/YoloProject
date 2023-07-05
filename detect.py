@@ -166,7 +166,9 @@ def run(
                     fruits.append(f"{n} {class_name}{'' if n == 1 else 's'}")
 
                 # Generate and save the QR code
-                qr_code_path = str(save_dir / f"{image_name}_qr_code.png")
+                qr_code_dir = save_dir / 'qr_codes' / p.stem
+                qr_code_dir.mkdir(parents=True, exist_ok=True)
+                qr_code_path = str(qr_code_dir / f"{image_name}_qr_code.png")
                 generate_qr_code(image_name, fruits, qr_code_path)
 
                 # Rescale boxes from img_size to im0 size
@@ -225,9 +227,6 @@ def run(
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
 
 
-
-
-
     # Print results
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
     LOGGER.info(f'Speed: %.1fms pre-process, %.1fms inference, %.1fms NMS per image at shape {(1, 3, *imgsz)}' % t)
@@ -237,7 +236,7 @@ def run(
     if update:
         strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
 
-
+# Generate QR Code
 def generate_qr_code(image_name, fruits, save_path):
     # Format the information string
     information = f"{image_name}: {', '.join(fruits)}"
@@ -251,9 +250,7 @@ def generate_qr_code(image_name, fruits, save_path):
     # Add text overlay to the QR code image
     draw = ImageDraw.Draw(qr_image)
     font = ImageFont.load_default()
-    text_width, text_height = draw.textsize(information, font=font)
-    text_position = (qr_image.width // 2 - text_width // 2, qr_image.height - text_height - 10)
-    draw.text(text_position, information, fill="black", font=font)
+    draw.text((5,5), information, fill="black", font=font,align='left')
     
     # Save the QR code image
     qr_image.save(save_path)
